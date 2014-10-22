@@ -50,7 +50,7 @@ public class PCFGParser implements Parser {
                 int end = begin + span - 1;
                 for (int split = begin; split < end; split++){
 
-                    for (String nterm:nonterms){
+                    for (String nterm:nonterms){ 
                         ArrayList<Grammar.BinaryRule> masterRules = new ArrayList<Grammar.BinaryRule>();
                         masterRules.addAll(grammar.getBinaryRulesByLeftChild(nterm));
                         masterRules.addAll(grammar.getBinaryRulesByRightChild(nterm));
@@ -75,11 +75,7 @@ public class PCFGParser implements Parser {
             }
         }
 
-        
-        Tree<String> s = buildTree(0,sentence.size()-1,"S",score, back, sentence);
-        ArrayList<Tree<String>> children = new ArrayList<Tree<String>>();
-        children.add(s);
-        return new Tree<String>("ROOT", children);
+        return TreeAnnotations.unAnnotateTree(buildTree(0,sentence.size()-1,"ROOT",score,back,sentence));
     }
 
     // public Tree<String> buildTree(double[][][] score, Triplet<Integer, String, String>[][][] back){
