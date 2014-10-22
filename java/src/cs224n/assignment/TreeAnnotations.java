@@ -26,8 +26,29 @@ public class TreeAnnotations {
 		// TODO : mark nodes with the label of their parent nodes, giving a second
 		// order vertical markov process
 
+		
+
+		secondOrderMarkovTree(unAnnotatedTree, "");
+
+
 		return binarizeTree(unAnnotatedTree);
 
+	}
+
+	private void secondOrderMarkovTree(Tree<String> tree, String parentLabel) {
+
+		String label = tree.getLabel();
+		if (tree.isLeaf()){
+			tree.setLabel(label + "^" + parentLabel);
+			return;
+		}
+		else 
+		{
+			for (Tree<String>child : tree.getChildren()) {
+				secondOrderMarkovTree(child, label);
+			}
+			tree.setLabel(label + "^" + parentLabel);
+		}
 	}
 
 	private static Tree<String> binarizeTree(Tree<String> tree) {
