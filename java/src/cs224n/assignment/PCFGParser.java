@@ -12,7 +12,6 @@ import cs224n.util.Triplet;
 public class PCFGParser implements Parser {
     private Grammar grammar;
     private Lexicon lexicon;
-    private HashMap<String, Integer> nontermIndices = new HashMap<String, Integer>();
     Set<String>nonterms;
 
     public void train(List<Tree<String>> trainTrees) {
@@ -22,24 +21,24 @@ public class PCFGParser implements Parser {
         }
         lexicon = new Lexicon(trainTrees);
         grammar = new Grammar(trainTrees);
-        System.out.println("#########" + grammar.toString());
     }
 
     public Tree<String> getBestParse(List<String> sentence) {
         nonterms = getAllNonTerms();
-        double[][][] score = new double[sentence.size()][sentence.size()][nonterms.size()];
-        Triplet<Integer, String, String> back[][][] = new Triplet[sentence.size()][sentence.size()][nonterms.size()];
-
+        HashMap<String,Double>[][] score = new HashMap[sentence.size()][sentence.size()];
+        HashMap<String,Triplet<Integer, String, String>>[][] back = new HashMap[sentence.size()][sentence.size()];
+        for(int i=0; i < sentence.size(); i++){
+            for(int j = 0; j < sentence.size(); j++){
+                score[i][j] = new HashMap<String,Double>();
+                back[i][j] = new HashMap<String,Triplet<Integer, String, String>>();
+            }
+        }
         for (int i=0; i < sentence.size(); i++){
             for (String a:nonterms){
                 String word = sentence.get(i);
-                score[i][i][nontermIndices.get(a)] = lexicon.scoreTagging(word,a);
-                if(Double.isNaN(score[i][i][nontermIndices.get(a)])){
-                    score[i][i][nontermIndices.get(a)] = 0;
-                }
-                else { 
-
-                    back[i][i][nontermIndices.get(a)] = new Triplet<Integer, String, String>(-2,a, word);
+                if(!Double.isNaN(lexicon.scoreTagging(word,a))){
+                    score[i][i].put(a,lexicon.scoreTagging(word,a));
+                    back[i][i].put(a, new Triplet<Integer, String, String>(-2,a, word));
                 }
             }
             addUnaryRule(score, back, i, i);
@@ -49,24 +48,22 @@ public class PCFGParser implements Parser {
             for (int begin=0; begin <= sentence.size() - span; begin++){
                 int end = begin + span - 1;
                 for (int split = begin; split < end; split++){
-
-                    for (String nterm:nonterms){ 
-                        ArrayList<Grammar.BinaryRule> masterRules = new ArrayList<Grammar.BinaryRule>();
-                        masterRules.addAll(grammar.getBinaryRulesByLeftChild(nterm));
-                        masterRules.addAll(grammar.getBinaryRulesByRightChild(nterm));
-                        for (Grammar.BinaryRule rule : masterRules){
+                    ArrayList<String>rightTerms = new ArrayList<String>();
+                    for(String right:score[split+1][end].keySet()){
+                        rightTerms.add(right);
+                    }
+                    for (String nterm:rightTerms){ 
+                        for (Grammar.BinaryRule rule : grammar.getBinaryRulesByRightChild(nterm)){
                             String a = rule.getParent();
                             String b = rule.getLeftChild();
                             String c = rule.getRightChild();
 
-                            int indexA = nontermIndices.get(a);
-                            int indexB = nontermIndices.get(b);
-                            int indexC = nontermIndices.get(c);
+                            if(score[begin][split].get(b) == null || score[begin][split].get(b) == 0) continue;
 
-                            double prob = score[begin][split][indexB] * score[split+1][end][indexC] * rule.getScore();
-                            if (prob > score[begin][end][indexA]) {
-                                score[begin][end][indexA] = prob;
-                                back[begin][end][indexA] = new Triplet<Integer, String, String>(split, b, c);
+                            double prob = score[begin][split].get(b) * score[split+1][end].get(c) * rule.getScore();
+                            if (score[begin][end].get(a) == null || prob > score[begin][end].get(a)) {
+                                score[begin][end].put(a, prob);
+                                back[begin][end].put(a, new Triplet<Integer, String, String>(split, b, c));
                             }
                         }
                     }
@@ -74,18 +71,17 @@ public class PCFGParser implements Parser {
                 }
             }
         }
-
-        return TreeAnnotations.unAnnotateTree(buildTree(0,sentence.size()-1,"ROOT",score,back,sentence));
+        return TreeAnnotations.unAnnotateTree(buildTree(0,sentence.size()-1,"ROOT",back));
     }
 
     // public Tree<String> buildTree(double[][][] score, Triplet<Integer, String, String>[][][] back){
     //     return constructTreeNode(i,j,"S", score, back);
     // }
 
-    public Tree<String> buildTree(int i,int j,String label, double[][][] score, Triplet<Integer, String, String>[][][] back, List<String> sentence){
-        Triplet<Integer, String, String> rule = back[i][j][nontermIndices.get(label)];
+    public Tree<String> buildTree(int i,int j,String label, HashMap<String,Triplet<Integer, String, String>>[][] back){
+        Triplet<Integer, String, String> rule = back[i][j].get(label);
         if(rule.getFirst() == -2){
-            Tree<String> leaf = new Tree<String>(sentence.get(i));
+            Tree<String> leaf = new Tree<String>(rule.getThird());
             ArrayList<Tree<String>> children = new ArrayList<Tree<String>>();
             children.add(leaf);
             Tree<String> preterminal = new Tree<String>(label, children);
@@ -93,7 +89,7 @@ public class PCFGParser implements Parser {
         }
         else if(rule.getFirst() == -1){
             String rightLabel = rule.getThird();
-            Tree<String> rChild = buildTree(i,j,rightLabel,score,back,sentence);
+            Tree<String> rChild = buildTree(i,j,rightLabel,back);
             ArrayList<Tree<String>> children = new ArrayList<Tree<String>>();
             children.add(rChild);
             Tree<String> root = new Tree<String>(label, children);
@@ -103,8 +99,8 @@ public class PCFGParser implements Parser {
             int split = rule.getFirst();
             String leftLabel = rule.getSecond();
             String rightLabel = rule.getThird();
-            Tree<String> lChild = buildTree(i,split,leftLabel,score,back, sentence);
-            Tree<String> rChild = buildTree(split+1,j,rightLabel,score,back, sentence);
+            Tree<String> lChild = buildTree(i,split,leftLabel,back);
+            Tree<String> rChild = buildTree(split+1,j,rightLabel,back);
             ArrayList<Tree<String>> children = new ArrayList<Tree<String>>();
             children.add(lChild);
             children.add(rChild);
@@ -113,24 +109,25 @@ public class PCFGParser implements Parser {
         }
     }
 
-    private void addUnaryRule(double[][][] score, Triplet[][][] back, int begin, int end) 
+    private void addUnaryRule(HashMap<String,Double>[][] score, HashMap<String,Triplet<Integer, String, String>>[][] back, int begin, int end) 
     {
         boolean added = true;
 
             while(added) {
                 added = false;
-                for (String b:nonterms){
+                ArrayList<String> terms = new ArrayList<String>();
+                for(String b: score[begin][end].keySet()){
+                    terms.add(b);
+                }
+                for (String b:terms){
                     for (Grammar.UnaryRule rule : grammar.getUnaryRulesByChild(b)) {
                         String a = rule.getParent();
 
-                        int indexA = nontermIndices.get(a);
-                        int indexB = nontermIndices.get(b);
-
-                        if (score[begin][end][indexB] > 0){
-                            double prob = rule.getScore()*score[begin][end][indexB];
-                            if (prob > score[begin][end][indexA]) {
-                                score[begin][end][indexA] = prob;
-                                back[begin][end][indexA] = new Triplet<Integer, String, String>(-1, a, b);
+                        if (score[begin][end].get(b) > 0){
+                            double prob = rule.getScore()*score[begin][end].get(b);
+                            if (score[begin][end].get(a) == null || prob > score[begin][end].get(a)) {
+                                score[begin][end].put(a, prob);
+                                back[begin][end].put(a, new Triplet<Integer, String, String>(-1, a, b));
                                 added = true;
                             }
                         }
@@ -171,11 +168,6 @@ public class PCFGParser implements Parser {
                     pqueue.add(parent,1);
                 }
             }
-        }
-        int index = -1;
-        for(String a: nonterms){
-            index++;
-            nontermIndices.put(a, index);
         }
         return nonterms;
     }

@@ -28,14 +28,14 @@ public class TreeAnnotations {
 
 		
 
-		secondOrderMarkovTree(unAnnotatedTree, "");
+		//secondOrderMarkovTree(unAnnotatedTree, "");
 
 
 		return binarizeTree(unAnnotatedTree);
 
 	}
 
-	private void secondOrderMarkovTree(Tree<String> tree, String parentLabel) {
+	private static void secondOrderMarkovTree(Tree<String> tree, String parentLabel) {
 
 		String label = tree.getLabel();
 		if (tree.isLeaf()){
