@@ -28,7 +28,7 @@ public class TreeAnnotations {
 
 		
 
-		//secondOrderMarkovTree(unAnnotatedTree, "");
+		secondOrderMarkovTree(unAnnotatedTree, "");
 
 
 		return binarizeTree(unAnnotatedTree);
@@ -39,7 +39,6 @@ public class TreeAnnotations {
 
 		String label = tree.getLabel();
 		if (tree.isLeaf()){
-			tree.setLabel(label + "^" + parentLabel);
 			return;
 		}
 		else 
@@ -47,7 +46,7 @@ public class TreeAnnotations {
 			for (Tree<String>child : tree.getChildren()) {
 				secondOrderMarkovTree(child, label);
 			}
-			tree.setLabel(label + "^" + parentLabel);
+			if(!label.equals("ROOT")) tree.setLabel(label + "^" + parentLabel);
 		}
 	}
 
